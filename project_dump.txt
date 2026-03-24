@@ -1,0 +1,2324 @@
+PROJECT STRUCTURE
+
+├── .gitignore
+├── .npmrc
+├── README.md
+├── app
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components
+│   ├── editor
+│   │   ├── BackgroundSelector.tsx
+│   │   ├── CompareSlider.tsx
+│   │   ├── EditorWorkspace.tsx
+│   │   └── Toolbar.tsx
+│   ├── ui
+│   │   ├── LoadingOverlay.tsx
+│   │   └── Spinner.tsx
+│   └── upload
+│       └── UploadArea.tsx
+├── eslint.config.mjs
+├── generateProjectDump.js
+├── hooks
+├── lib
+│   ├── aiWorkerClient.js
+│   ├── backgroundReplace.js
+│   ├── batchQueue.js
+│   ├── exportZip.js
+│   └── removeBackground.js
+├── next-env.d.ts
+├── next.config.ts
+├── plugins
+│   └── pluginSystem.js
+├── postcss.config.mjs
+├── project_dump.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── store
+│   └── imageStore.js
+├── tailwind.config.js
+├── tsconfig.json
+└── workers
+    └── aiWorker.js
+
+================================
+FILE: README.md
+================================
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+================================
+FILE: app/globals.css
+================================
+
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+================================
+FILE: app/layout.tsx
+================================
+
+import "./globals.css";
+import { ReactNode } from "react";
+
+export const metadata = {
+  title: "AI Background Remover",
+  description: "Ultra open source background remover",
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="bg-slate-950 text-white">
+        {children}
+      </body>
+    </html>
+  );
+}
+
+================================
+FILE: app/page.tsx
+================================
+
+"use client";
+
+import useImageStore from "@/store/imageStore";
+import UploadArea from "@/components/upload/UploadArea";
+import EditorWorkspace from "@/components/editor/EditorWorkspace";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+
+export default function Page() {
+  const processing = useImageStore(s => s.processing);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+      
+      {/* Loading Overlay */}
+      {processing && <LoadingOverlay message="Processing your image..." />}
+
+      {/* Header */}
+      <header className="border-b border-slate-800 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">✨</div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                  BG Remover Beast
+                </h1>
+                <p className="text-sm text-slate-400">AI-powered background removal</p>
+              </div>
+            </div>
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-white transition"
+            >
+              GitHub ↗
+            </a>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-12">
+        
+        {/* Hero Section */}
+        <div className="text-center mb-16 animate-fade-in">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            Remove Backgrounds Instantly
+          </h2>
+          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            Powered by AI. No watermarks. Works in your browser. Process single images or batch process dozens at once.
+          </p>
+        </div>
+
+        {/* Upload Section */}
+        <div className="mb-16 animate-slide-up" style={{ animationDelay: "100ms" }}>
+          <UploadArea />
+        </div>
+
+        {/* Editor Section */}
+        <div className="animate-slide-up" style={{ animationDelay: "200ms" }}>
+          <EditorWorkspace />
+        </div>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-800 mt-20">
+        <div className="max-w-7xl mx-auto px-4 py-8 text-center text-slate-500">
+          <p>Built with Next.js, React, & AI. No data is stored on servers.</p>
+        </div>
+      </footer>
+
+      {/* Styles */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+
+        .animate-slide-up {
+          animation: slide-up 0.6s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
+
+    </div>
+  );
+}
+
+================================
+FILE: components/editor/BackgroundSelector.tsx
+================================
+
+"use client";
+
+import { useRef } from "react";
+import useImageStore from "@/store/imageStore";
+
+export default function BackgroundSelector() {
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const backgroundMode = useImageStore(s => s.backgroundMode);
+  const backgroundColor = useImageStore(s => s.backgroundColor);
+  const setBackgroundColor = useImageStore(s => s.setBackgroundColor);
+  const setBackgroundImage = useImageStore(s => s.setBackgroundImage);
+  const clearBackground = useImageStore(s => s.clearBackground);
+
+  function handleColorChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setBackgroundColor(e.target.value);
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files?.[0]) return;
+    const url = URL.createObjectURL(e.target.files[0]);
+    setBackgroundImage(url);
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-2xl p-6 shadow-xl">
+      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+        <span>🎨</span>
+        Background Options
+      </h3>
+
+      <div className="flex flex-col gap-3">
+        {/* Remove Background */}
+        <button
+          onClick={clearBackground}
+          className={`p-4 rounded-xl transition-all transform hover:scale-105 text-left ${
+            backgroundMode === null
+              ? "bg-linear-to-r from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-500/30"
+              : "bg-slate-700/50 hover:bg-slate-600/50"
+          }`}
+        >
+          <div className="font-semibold">✨ Remove Background</div>
+          <div className="text-sm opacity-75">Transparent background</div>
+        </button>
+
+        {/* Color Background */}
+        <div className="flex gap-2 items-stretch">
+          <button
+            onClick={() => colorInputRef.current?.click()}
+            className={`flex-1 p-4 rounded-xl transition-all transform hover:scale-105 text-left ${
+              backgroundMode === "color"
+                ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg shadow-blue-500/30"
+                : "bg-slate-700/50 hover:bg-slate-600/50"
+            }`}
+          >
+            <div className="font-semibold">🎨 Solid Color</div>
+            <div className="text-sm opacity-75">Custom background</div>
+          </button>
+          <button
+            onClick={() => colorInputRef.current?.click()}
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              backgroundMode === "color"
+                ? "bg-linear-to-r from-blue-600 to-blue-500"
+                : "bg-slate-700/50 hover:bg-slate-600/50"
+            }`}
+            title="Pick a color"
+          >
+            <div
+              className="w-10 h-10 rounded-lg border-2 border-white/30 shadow-lg"
+              style={{ backgroundColor }}
+            />
+          </button>
+          <input
+            type="color"
+            hidden
+            ref={colorInputRef}
+            value={backgroundColor}
+            onChange={handleColorChange}
+          />
+        </div>
+
+        {/* Image Background */}
+        <button
+          onClick={() => imageInputRef.current?.click()}
+          className={`p-4 rounded-xl transition-all transform hover:scale-105 text-left ${
+            backgroundMode === "image"
+              ? "bg-gradient-to-r from-purple-600 to-purple-500 shadow-lg shadow-purple-500/30"
+              : "bg-slate-700/50 hover:bg-slate-600/50"
+          }`}
+        >
+          <div className="font-semibold">🖼️ Image Background</div>
+          <div className="text-sm opacity-75">Custom image</div>
+        </button>
+        <input
+          type="file"
+          hidden
+          ref={imageInputRef}
+          accept="image/*"
+          onChange={handleImageUpload}
+        />
+      </div>
+    </div>
+  );
+}
+
+
+================================
+FILE: components/editor/CompareSlider.tsx
+================================
+
+"use client";
+
+import { useRef, useState, useEffect } from "react";
+
+export default function CompareSlider({ original, result }: { original: string; result: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sliderPos, setSliderPos] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  if (!original) return null;
+
+  // Update container width on mount and window resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    const resizeObserver = new ResizeObserver(updateWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const handleMouseDown = () => {
+    setIsDragging(true);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+
+    setSliderPos(percent);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener("mouseup", handleMouseUp);
+      return () => window.removeEventListener("mouseup", handleMouseUp);
+    }
+  }, [isDragging]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full max-w-3xl bg-slate-800 rounded-2xl overflow-hidden cursor-col-resize select-none shadow-2xl hover:shadow-3xl transition-shadow"
+      style={{ aspectRatio: "16 / 9" }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => isDragging && setIsDragging(false)}
+    >
+      {/* Original Image (Full) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900">
+        <img
+          src={original}
+          alt="Original image"
+          className="w-full h-full object-cover pointer-events-none"
+        />
+      </div>
+
+      {/* Processed Image (Clipped by slider) */}
+      {result && (
+        <div
+          className="absolute inset-0 overflow-hidden transition-opacity"
+          style={{ width: `${sliderPos}%` }}
+        >
+          <img
+            src={result}
+            alt="Processed image"
+            className="w-full h-full object-cover pointer-events-none"
+            style={{
+              width: containerRef.current ? `${(100 / sliderPos) * 100}%` : "100%",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Slider Handle */}
+      <div
+        className="absolute top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 via-white to-purple-400 cursor-col-resize shadow-lg transition-opacity"
+        style={{
+          left: `${sliderPos}%`,
+          opacity: isDragging ? 1 : 0.8,
+          transform: "translateX(-50%)",
+          boxShadow: isDragging ? "0 0 20px rgba(59, 130, 246, 0.8)" : "none",
+        }}
+        onMouseDown={handleMouseDown}
+      >
+        {/* Grip Visual */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform">
+          <div className="flex gap-1">
+            <div className="w-0.5 h-5 bg-slate-800 rounded" />
+            <div className="w-0.5 h-5 bg-slate-800 rounded" />
+            <div className="w-0.5 h-5 bg-slate-800 rounded" />
+          </div>
+        </div>
+      </div>
+
+      {/* Labels with Background */}
+      <div className="absolute top-4 left-4 flex gap-2 items-center">
+        <div className="px-3 py-2 bg-black/60 backdrop-blur-sm rounded-lg text-sm font-semibold border border-white/20">
+          Original
+        </div>
+      </div>
+      <div className="absolute top-4 right-4 flex gap-2 items-center">
+        <div className="px-3 py-2 bg-black/60 backdrop-blur-sm rounded-lg text-sm font-semibold border border-white/20">
+          {result ? "Processed" : "Processing..."}
+        </div>
+      </div>
+
+      {/* Hint for Desktop */}
+      {result && !isDragging && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs text-slate-400 bg-black/40 px-3 py-1 rounded-full opacity-0 hover:opacity-100 transition-opacity">
+          Drag to compare
+        </div>
+      )}
+    </div>
+  );
+}
+
+================================
+FILE: components/editor/EditorWorkspace.tsx
+================================
+
+"use client";
+
+import { useState } from "react";
+import useImageStore from "@/store/imageStore";
+import removeBackground from "@/lib/removeBackground";
+import { createTransparent, replaceBackgroundWithImage, replaceBackgroundWithColor } from "@/lib/backgroundReplace";
+import { BatchQueue } from "@/lib/batchQueue";
+import { exportZip, downloadZip } from "@/lib/exportZip";
+import CompareSlider from "./CompareSlider";
+import BackgroundSelector from "./BackgroundSelector";
+import Toolbar from "./Toolbar";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+
+export default function EditorWorkspace(){
+
+  const image = useImageStore(s=>s.image);
+  const result = useImageStore(s=>s.result);
+  const setResult = useImageStore(s=>s.setResult);
+  const processing = useImageStore(s=>s.processing);
+  const setProcessing = useImageStore(s=>s.setProcessing);
+  
+  // Background management
+  const backgroundMode = useImageStore(s=>s.backgroundMode);
+  const backgroundColor = useImageStore(s=>s.backgroundColor);
+  const backgroundImage = useImageStore(s=>s.backgroundImage);
+
+  // Batch mode
+  const batchQueue = useImageStore(s=>s.batchQueue);
+  const batchResults = useImageStore(s=>s.batchResults);
+  const batchMode = useImageStore(s=>s.batchMode);
+  const updateBatchItem = useImageStore(s=>s.updateBatchItem);
+  const addBatchResult = useImageStore(s=>s.addBatchResult);
+
+  const [applyingBackground, setApplyingBackground] = useState(false);
+
+  async function processSingle(){
+    try {
+      setProcessing(true);
+      const output = await removeBackground(image);
+      setResult(output);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function applyBackground(){
+    if (!image || !result) return;
+    
+    try {
+      setApplyingBackground(true);
+      let finalResult;
+
+      if (backgroundMode === "color") {
+        finalResult = await replaceBackgroundWithColor(image, backgroundColor);
+      } else if (backgroundMode === "image") {
+        finalResult = await replaceBackgroundWithImage(image, backgroundImage);
+      } else {
+        finalResult = await createTransparent(image);
+      }
+
+      setResult(finalResult);
+    } finally {
+      setApplyingBackground(false);
+    }
+  }
+
+  function exportResult(format: "png" | "jpg") {
+    if (!result) return;
+
+    const link = document.createElement("a");
+    link.href = result;
+    link.download = `background-removed-${Date.now()}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function processBatch(){
+    if (processing) return;
+    setProcessing(true);
+
+    const queue = new BatchQueue();
+    batchQueue.forEach((item: any, idx: number) => {
+      queue.add({ ...item, index: idx });
+    });
+
+    const processor = async (task: any) => {
+      try {
+        updateBatchItem(task.index, { status: "processing" });
+        const dataUrl = await removeBackground(task.url);
+        updateBatchItem(task.index, { status: "done", result: dataUrl });
+        
+        return {
+          fileName: task.fileName,
+          dataUrl: dataUrl,
+          status: "done"
+        };
+      } catch (error) {
+        updateBatchItem(task.index, { status: "error", error: (error as Error).message });
+        return {
+          fileName: task.fileName,
+          status: "error",
+          error: (error as Error).message
+        };
+      }
+    };
+
+    const results = await queue.process(processor);
+    if (results) {
+      results.forEach((r: any) => addBatchResult(r));
+    }
+    setProcessing(false);
+  }
+
+  async function downloadBatch(){
+    if (batchResults.length === 0) return;
+    
+    const zip = await exportZip(batchResults);
+    downloadZip(zip, `background-removed_${Date.now()}.zip`);
+  }
+
+  // Single image mode
+  if (!batchMode && image) {
+    return(
+      <>
+        {applyingBackground && <LoadingOverlay message="Applying background..." />}
+        
+        <div className="flex flex-col gap-8 items-center w-full">
+          
+          {/* Comparison Slider */}
+          <div className="animate-slide-up">
+            <CompareSlider original={image} result={result}/>
+          </div>
+
+          {/* Controls Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+            
+            {/* Left - Background Options */}
+            <div className="lg:col-span-1 animate-slide-up" style={{ animationDelay: "100ms" }}>
+              <BackgroundSelector />
+            </div>
+
+            {/* Center/Right - Action Buttons */}
+            <div className="lg:col-span-2 animate-slide-up" style={{ animationDelay: "200ms" }}>
+              <div className="flex flex-col gap-4">
+                
+                {/* Apply Background Button */}
+                {result && backgroundMode !== null && (
+                  <button
+                    onClick={applyBackground}
+                    disabled={applyingBackground}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-bold text-lg shadow-lg hover:shadow-xl disabled:hover:scale-100"
+                  >
+                    {applyingBackground ? "⏳ Applying..." : "✨ Apply Background"}
+                  </button>
+                )}
+
+                {/* Process & Export Buttons */}
+                <Toolbar 
+                  process={processSingle} 
+                  disabled={processing}
+                  onExport={exportResult}
+                  hasResult={!!result}
+                />
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </>
+    );
+  }
+
+  // Batch mode
+  if (batchMode) {
+    return (
+      <div className="w-full">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-2xl p-8 shadow-2xl">
+          
+          <div className="flex items-center gap-4 mb-8">
+            <div className="text-5xl">📦</div>
+            <div>
+              <h2 className="text-3xl font-bold text-blue-400">Batch Processing</h2>
+              <p className="text-slate-400">Process multiple images at once</p>
+            </div>
+          </div>
+
+          {/* Queue display */}
+          <div className="mb-8 max-h-96 overflow-y-auto rounded-xl bg-slate-900/50 p-4">
+            {batchQueue.map((item: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-4 p-3 mb-2 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors">
+                <div className="text-2xl">📄</div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium truncate">{item.fileName}</p>
+                  <p className="text-xs text-slate-400">
+                    <span className={
+                      item.status === "done" ? "text-green-400" :
+                      item.status === "processing" ? "text-blue-400 font-semibold" :
+                      item.status === "error" ? "text-red-400" :
+                      "text-slate-400"
+                    }>
+                      {item.status === "done" && "✓ Done"}
+                      {item.status === "processing" && "⏳ Processing..."}
+                      {item.status === "error" && "✗ Error"}
+                      {item.status === "pending" && "⏸ Pending"}
+                    </span>
+                  </p>
+                </div>
+                {item.result && <span className="text-2xl">✅</span>}
+              </div>
+            ))}
+          </div>
+
+          {/* Stats */}
+          {batchResults.length > 0 && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl border border-green-700/50">
+              <p className="text-sm font-semibold text-green-300">
+                ✓ {batchResults.filter((r: any) => r.status === "done").length} of {batchQueue.length} Processed
+              </p>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="flex gap-4 flex-col sm:flex-row">
+            <button
+              onClick={processBatch}
+              disabled={processing || batchQueue.length === 0}
+              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8 py-4 rounded-xl hover:rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-bold text-lg shadow-lg hover:shadow-xl disabled:hover:scale-100"
+            >
+              {processing ? "⏳ Processing..." : `🚀 Process All (${batchQueue.length})`}
+            </button>
+
+            {batchResults.length > 0 && (
+              <button
+                onClick={downloadBatch}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-8 py-4 rounded-xl hover:rounded-2xl transition-all transform hover:scale-105 font-bold text-lg shadow-lg hover:shadow-xl"
+              >
+                ⬇️ Download ZIP
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+================================
+FILE: components/editor/Toolbar.tsx
+================================
+
+"use client";
+
+export default function Toolbar({ 
+  process, 
+  disabled = false, 
+  onExport,
+  hasResult = false 
+}: {
+  process: () => void;
+  disabled?: boolean;
+  onExport?: (format: "png" | "jpg") => void;
+  hasResult?: boolean;
+}) {
+
+  return (
+    <div className="flex flex-col gap-4 w-full max-w-3xl">
+      
+      {/* Process Button */}
+      <button
+        onClick={process}
+        disabled={disabled}
+        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-bold text-lg shadow-lg hover:shadow-xl disabled:hover:scale-100"
+      >
+        {disabled ? "⏳ Processing..." : "🚀 Remove Background"}
+      </button>
+
+      {/* Export Buttons */}
+      {hasResult && (
+        <div className="flex gap-3 flex-col sm:flex-row">
+          <button
+            onClick={() => onExport?.("png")}
+            className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-6 py-3 rounded-xl transition-all transform hover:scale-105 text-base font-semibold shadow-lg hover:shadow-xl"
+          >
+            💾 Export PNG
+          </button>
+          <button
+            onClick={() => onExport?.("jpg")}
+            className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 px-6 py-3 rounded-xl transition-all transform hover:scale-105 text-base font-semibold shadow-lg hover:shadow-xl"
+          >
+            💾 Export JPG
+          </button>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+================================
+FILE: components/ui/LoadingOverlay.tsx
+================================
+
+"use client";
+
+import Spinner from "./Spinner";
+
+export default function LoadingOverlay({ message = "Processing..." }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+        <Spinner />
+        <p className="mt-4 text-lg font-medium text-slate-200">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+
+================================
+FILE: components/ui/Spinner.tsx
+================================
+
+"use client";
+
+export default function Spinner() {
+  return (
+    <div className="flex items-center justify-center">
+      <div className="relative w-10 h-10">
+        <div className="absolute inset-0 rounded-full border-4 border-slate-700"></div>
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-400 animate-spin"></div>
+      </div>
+    </div>
+  );
+}
+
+
+================================
+FILE: components/upload/UploadArea.tsx
+================================
+
+"use client";
+
+import { useRef, useState } from "react";
+import useImageStore from "@/store/imageStore";
+
+export default function UploadArea() {
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const setImage = useImageStore(s => s.setImage);
+  const addToBatch = useImageStore(s => s.addToBatch);
+  const batchMode = useImageStore(s => s.batchMode);
+  const clearBatch = useImageStore(s => s.clearBatch);
+
+  function handleSingleFile(file: File) {
+    const url = URL.createObjectURL(file);
+    setImage(url);
+  }
+
+  function handleMultipleFiles(files: FileList | null) {
+    if (!files) return;
+    const fileArray = Array.from(files);
+    addToBatch(fileArray);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files) return;
+
+    if (e.target.multiple || e.target.files.length > 1) {
+      handleMultipleFiles(e.target.files);
+    } else {
+      handleSingleFile(e.target.files[0]);
+    }
+  }
+
+  function handleDrag(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setIsDragActive(true);
+    } else if (e.type === "dragleave") {
+      setIsDragActive(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>, isMultiple: boolean) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+
+    if (e.dataTransfer.files) {
+      if (isMultiple) {
+        handleMultipleFiles(e.dataTransfer.files);
+      } else {
+        handleSingleFile(e.dataTransfer.files[0]);
+      }
+    }
+  }
+
+  function startSingleMode() {
+    if (inputRef.current) {
+      inputRef.current.multiple = false;
+      inputRef.current.click();
+    }
+  }
+
+  function startBatchMode() {
+    if (inputRef.current) {
+      inputRef.current.multiple = true;
+      inputRef.current.click();
+    }
+  }
+
+  return (
+    <div className="w-full max-w-4xl mx-auto">
+      <input
+        type="file"
+        hidden
+        ref={inputRef}
+        accept="image/*"
+        onChange={handleInputChange}
+      />
+
+      {!batchMode ? (
+        <div className="flex flex-col gap-6 lg:flex-row">
+          {/* Single Image Upload */}
+          <div
+            className={`flex-1 border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer ${
+              isDragActive
+                ? "border-indigo-400 bg-indigo-500/10"
+                : "border-slate-600 hover:border-indigo-500 hover:bg-slate-800/50"
+            }`}
+            onDragEnter={(e) => handleDrag(e)}
+            onDragLeave={(e) => handleDrag(e)}
+            onDragOver={(e) => handleDrag(e)}
+            onDrop={(e) => handleDrop(e, false)}
+            onClick={startSingleMode}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="text-4xl">🖼️</div>
+              <h2 className="text-xl font-semibold">Single Image</h2>
+              <p className="text-sm text-slate-400 text-center">
+                Drop your image here or click to browse
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startSingleMode();
+                }}
+                className="mt-2 bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg transition font-medium text-sm"
+              >
+                Select Image
+              </button>
+            </div>
+          </div>
+
+          {/* Batch Upload */}
+          <div
+            className={`flex-1 border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer ${
+              isDragActive
+                ? "border-blue-400 bg-blue-500/10"
+                : "border-slate-600 hover:border-blue-500 hover:bg-slate-800/50"
+            }`}
+            onDragEnter={(e) => handleDrag(e)}
+            onDragLeave={(e) => handleDrag(e)}
+            onDragOver={(e) => handleDrag(e)}
+            onDrop={(e) => handleDrop(e, true)}
+            onClick={startBatchMode}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="text-4xl">📦</div>
+              <h2 className="text-xl font-semibold">Batch Process</h2>
+              <p className="text-sm text-slate-400 text-center">
+                Drop multiple images or click to select
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startBatchMode();
+                }}
+                className="mt-2 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition font-medium text-sm"
+              >
+                Select Images
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="border-2 border-blue-600 bg-blue-500/10 rounded-2xl p-8 backdrop-blur-sm">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="text-3xl">📦</div>
+            <div>
+              <h2 className="text-2xl font-bold text-blue-400">Batch Mode</h2>
+              <p className="text-slate-400">Ready to process multiple images</p>
+            </div>
+          </div>
+          <button
+            onClick={clearBatch}
+            className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg transition font-medium"
+          >
+            Clear & Start Over
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+================================
+FILE: generateProjectDump.js
+================================
+
+const fs = require("fs");
+const path = require("path");
+
+const OUTPUT_FILE = "project_dump.txt";
+
+const EXCLUDE = [
+  "node_modules",
+  ".next",
+  ".git",
+  "dist",
+  "build",
+  "coverage",
+  ".env",
+  ".DS_Store",
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock"
+];
+
+let output = "";
+
+/* -------- TREE -------- */
+
+function generateTree(dir, prefix = "") {
+  const files = fs.readdirSync(dir);
+
+  files.forEach((file, index) => {
+    if (EXCLUDE.includes(file)) return;
+
+    const fullPath = path.join(dir, file);
+    const isLast = index === files.length - 1;
+    const connector = isLast ? "└── " : "├── ";
+
+    output += `${prefix}${connector}${file}\n`;
+
+    if (fs.statSync(fullPath).isDirectory()) {
+      generateTree(fullPath, prefix + (isLast ? "    " : "│   "));
+    }
+  });
+}
+
+/* -------- FILE CONTENT -------- */
+
+function collectFiles(dir) {
+  const files = fs.readdirSync(dir);
+
+  files.forEach((file) => {
+    if (EXCLUDE.includes(file)) return;
+
+    const fullPath = path.join(dir, file);
+
+    if (fs.statSync(fullPath).isDirectory()) {
+      collectFiles(fullPath);
+    } else {
+      const ext = path.extname(file);
+
+      if (
+        [".js", ".jsx", ".ts", ".tsx", ".css", ".md"].includes(ext)
+      ) {
+        const content = fs.readFileSync(fullPath, "utf8");
+
+        output += `\n================================\n`;
+        output += `FILE: ${fullPath}\n`;
+        output += `================================\n\n`;
+        output += content + "\n";
+      }
+    }
+  });
+}
+
+/* -------- RUN -------- */
+
+output += "PROJECT STRUCTURE\n\n";
+
+generateTree(".");
+collectFiles(".");
+
+fs.writeFileSync(OUTPUT_FILE, output);
+
+console.log("✅ Project dump generated → project_dump.txt");
+
+================================
+FILE: lib/aiWorkerClient.js
+================================
+
+// Client for communicating with AI Worker
+// Falls back to main thread if worker fails
+
+let worker = null;
+let messageId = 0;
+const pendingMessages = new Map();
+let workerAvailable = false;
+
+/**
+ * Create worker safely
+ */
+function createWorker() {
+  try {
+    return new Worker(
+      new URL("../workers/aiWorker.js", import.meta.url),
+      { type: "module" }
+    );
+  } catch (error) {
+    console.error("Worker creation failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Initialize the AI worker
+ */
+export async function initWorker() {
+
+  if (workerAvailable) return;
+  if (worker) return;
+
+  worker = createWorker();
+
+  if (!worker) {
+    throw new Error("Worker not supported in this environment");
+  }
+
+  worker.onmessage = (e) => {
+
+    const { id, type, data, error, success } = e.data;
+
+    const pending = pendingMessages.get(id);
+    if (!pending) return;
+
+    if (type === "ERROR" || !success) {
+      pending.reject(new Error(error || "Worker error"));
+    } else {
+      pending.resolve(data);
+    }
+
+    pendingMessages.delete(id);
+
+  };
+
+  worker.onerror = (error) => {
+    console.error("Worker runtime error:", error);
+  };
+
+  // Wait for worker init
+  return new Promise((resolve, reject) => {
+
+    const id = messageId++;
+    let completed = false;
+
+    const timeoutId = setTimeout(() => {
+
+      if (!completed) {
+
+        completed = true;
+
+        pendingMessages.delete(id);
+
+        if (worker) {
+          worker.terminate();
+          worker = null;
+        }
+
+        reject(
+          new Error(
+            "Worker initialization timeout — falling back to main thread"
+          )
+        );
+      }
+
+    }, 60000);
+
+    pendingMessages.set(id, {
+
+      resolve: () => {
+
+        if (!completed) {
+
+          completed = true;
+
+          clearTimeout(timeoutId);
+
+          workerAvailable = true;
+
+          resolve();
+
+        }
+
+      },
+
+      reject: (err) => {
+
+        if (!completed) {
+
+          completed = true;
+
+          clearTimeout(timeoutId);
+
+          if (worker) {
+            worker.terminate();
+            worker = null;
+          }
+
+          reject(err);
+
+        }
+
+      }
+
+    });
+
+    worker.postMessage({
+      id,
+      type: "INIT"
+    });
+
+  });
+
+}
+
+/**
+ * Run segmentation on image data
+ */
+export async function segmentImage(imageData) {
+
+  if (!worker || !workerAvailable) {
+    throw new Error("Worker not available");
+  }
+
+  return new Promise((resolve, reject) => {
+
+    const id = messageId++;
+    let completed = false;
+
+    const timeoutId = setTimeout(() => {
+
+      if (!completed) {
+
+        completed = true;
+
+        pendingMessages.delete(id);
+
+        reject(new Error("Segmentation timeout"));
+
+      }
+
+    }, 180000);
+
+    pendingMessages.set(id, {
+
+      resolve: (data) => {
+
+        if (!completed) {
+
+          completed = true;
+
+          clearTimeout(timeoutId);
+
+          resolve(data);
+
+        }
+
+      },
+
+      reject: (err) => {
+
+        if (!completed) {
+
+          completed = true;
+
+          clearTimeout(timeoutId);
+
+          reject(err);
+
+        }
+
+      }
+
+    });
+
+    worker.postMessage(
+      {
+        id,
+        type: "SEGMENT",
+        data: { imageData }
+      },
+      imageData instanceof ImageBitmap ? [imageData] : []
+    );
+
+  });
+
+}
+
+/**
+ * Terminate worker
+ */
+export function terminateWorker() {
+
+  if (worker) {
+
+    worker.terminate();
+
+    worker = null;
+
+  }
+
+  pendingMessages.clear();
+
+  messageId = 0;
+
+  workerAvailable = false;
+
+}
+
+/**
+ * Check if worker ready
+ */
+export function isWorkerReady() {
+  return worker !== null && workerAvailable;
+}
+
+================================
+FILE: lib/backgroundReplace.js
+================================
+
+import { initWorker, segmentImage, isWorkerReady } from "./aiWorkerClient";
+
+// Initialize worker on first import
+let workerInitPromise = null;
+
+function ensureWorkerInit() {
+  if (isWorkerReady()) {
+    return Promise.resolve();
+  }
+  if (workerInitPromise) {
+    return workerInitPromise;
+  }
+  workerInitPromise = initWorker();
+  return workerInitPromise;
+}
+
+/**
+ * Create transparent background by removing detected subject background
+ */
+export async function createTransparent(imageUrl) {
+  await ensureWorkerInit();
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageUrl;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  const imgWidth = img.width;
+  const imgHeight = img.height;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = imgWidth;
+  canvas.height = imgHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, imgWidth, imgHeight);
+
+  let imageBitmap;
+  try {
+    imageBitmap = await createImageBitmap(canvas);
+  } catch {
+    imageBitmap = canvas;
+  }
+
+  const { maskData, maskShape } = await segmentImage(imageBitmap);
+
+  const maskHeight = maskShape[0];
+  const maskWidth = maskShape[1];
+
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = imgWidth;
+  finalCanvas.height = imgHeight;
+
+  const finalCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
+  finalCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
+
+  const imageData = finalCtx.getImageData(0, 0, imgWidth, imgHeight);
+  const data = imageData.data;
+
+  const scaleX = maskWidth / imgWidth;
+  const scaleY = maskHeight / imgHeight;
+
+  for (let y = 0; y < imgHeight; y++) {
+    for (let x = 0; x < imgWidth; x++) {
+      const maskX = Math.floor(x * scaleX);
+      const maskY = Math.floor(y * scaleY);
+      const maskIndex = maskY * maskWidth + maskX;
+
+      const alpha = maskData[maskIndex] * 255;
+      const pixelIndex = (y * imgWidth + x) * 4 + 3;
+      data[pixelIndex] = Math.round(alpha);
+    }
+  }
+
+  finalCtx.putImageData(imageData, 0, 0);
+  const pngDataUrl = finalCanvas.toDataURL("image/png");
+
+  img.src = "";
+  canvas.width = 0;
+  canvas.height = 0;
+  finalCanvas.width = 0;
+  finalCanvas.height = 0;
+
+  if (imageBitmap && imageBitmap !== canvas) {
+    try {
+      imageBitmap.close?.();
+    } catch {
+      // ImageBitmap close might not be available
+    }
+  }
+
+  return pngDataUrl;
+}
+
+/**
+ * Replace background with another image
+ */
+export async function replaceBackgroundWithImage(imageUrl, backgroundImageUrl) {
+  await ensureWorkerInit();
+
+  // Load subject image
+  const subjectImg = new Image();
+  subjectImg.crossOrigin = "anonymous";
+  subjectImg.src = imageUrl;
+
+  await new Promise((resolve, reject) => {
+    subjectImg.onload = resolve;
+    subjectImg.onerror = reject;
+  });
+
+  // Load background image
+  const bgImg = new Image();
+  bgImg.crossOrigin = "anonymous";
+  bgImg.src = backgroundImageUrl;
+
+  await new Promise((resolve, reject) => {
+    bgImg.onload = resolve;
+    bgImg.onerror = reject;
+  });
+
+  const imgWidth = subjectImg.width;
+  const imgHeight = subjectImg.height;
+
+  // Get segmentation mask
+  const canvas = document.createElement("canvas");
+  canvas.width = imgWidth;
+  canvas.height = imgHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(subjectImg, 0, 0, imgWidth, imgHeight);
+
+  let imageBitmap;
+  try {
+    imageBitmap = await createImageBitmap(canvas);
+  } catch {
+    imageBitmap = canvas;
+  }
+
+  const { maskData, maskShape } = await segmentImage(imageBitmap);
+
+  const maskHeight = maskShape[0];
+  const maskWidth = maskShape[1];
+
+  // Create output canvas
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = imgWidth;
+  outputCanvas.height = imgHeight;
+  const outCtx = outputCanvas.getContext("2d");
+
+  // Draw background (scaled to fit)
+  outCtx.drawImage(bgImg, 0, 0, imgWidth, imgHeight);
+
+  // Draw subject on top using mask
+  outCtx.drawImage(subjectImg, 0, 0, imgWidth, imgHeight);
+
+  // Get image data and apply mask
+  const imageData = outCtx.getImageData(0, 0, imgWidth, imgHeight);
+  const data = imageData.data;
+
+  const scaleX = maskWidth / imgWidth;
+  const scaleY = maskHeight / imgHeight;
+
+  for (let y = 0; y < imgHeight; y++) {
+    for (let x = 0; x < imgWidth; x++) {
+      const maskX = Math.floor(x * scaleX);
+      const maskY = Math.floor(y * scaleY);
+      const maskIndex = maskY * maskWidth + maskX;
+
+      const alpha = maskData[maskIndex];
+      const pixelIndex = (y * imgWidth + x) * 4;
+
+      if (alpha < 0.5) {
+        // Background area - keep background
+        // (already drawn)
+      } else {
+        // Subject area - draw subject
+        const subjectPixel = getPixelAt(subjectImg, x, y, imgWidth, imgHeight);
+        data[pixelIndex] = subjectPixel.r;
+        data[pixelIndex + 1] = subjectPixel.g;
+        data[pixelIndex + 2] = subjectPixel.b;
+        data[pixelIndex + 3] = subjectPixel.a;
+      }
+    }
+  }
+
+  outCtx.putImageData(imageData, 0, 0);
+  const jpgDataUrl = outputCanvas.toDataURL("image/jpeg", 0.95);
+
+  // Cleanup
+  subjectImg.src = "";
+  bgImg.src = "";
+  canvas.width = 0;
+  canvas.height = 0;
+  outputCanvas.width = 0;
+  outputCanvas.height = 0;
+
+  if (imageBitmap && imageBitmap !== canvas) {
+    try {
+      imageBitmap.close?.();
+    } catch {
+      // ImageBitmap close might not be available
+    }
+  }
+
+  return jpgDataUrl;
+}
+
+/**
+ * Replace background with solid color
+ */
+export async function replaceBackgroundWithColor(imageUrl, color) {
+  await ensureWorkerInit();
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageUrl;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  const imgWidth = img.width;
+  const imgHeight = img.height;
+
+  // Get segmentation mask
+  const canvas = document.createElement("canvas");
+  canvas.width = imgWidth;
+  canvas.height = imgHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, imgWidth, imgHeight);
+
+  let imageBitmap;
+  try {
+    imageBitmap = await createImageBitmap(canvas);
+  } catch {
+    imageBitmap = canvas;
+  }
+
+  const { maskData, maskShape } = await segmentImage(imageBitmap);
+
+  const maskHeight = maskShape[0];
+  const maskWidth = maskShape[1];
+
+  // Create output canvas
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = imgWidth;
+  outputCanvas.height = imgHeight;
+  const outCtx = outputCanvas.getContext("2d");
+
+  // Fill with color
+  outCtx.fillStyle = color;
+  outCtx.fillRect(0, 0, imgWidth, imgHeight);
+
+  // Draw original image
+  outCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
+
+  // Apply mask to composite
+  const imageData = outCtx.getImageData(0, 0, imgWidth, imgHeight);
+  const data = imageData.data;
+
+  const scaleX = maskWidth / imgWidth;
+  const scaleY = maskHeight / imgHeight;
+
+  for (let y = 0; y < imgHeight; y++) {
+    for (let x = 0; x < imgWidth; x++) {
+      const maskX = Math.floor(x * scaleX);
+      const maskY = Math.floor(y * scaleY);
+      const maskIndex = maskY * maskWidth + maskX;
+
+      const alpha = maskData[maskIndex];
+      const pixelIndex = (y * imgWidth + x) * 4 + 3;
+
+      // Use mask as alpha - subject opaque, background alpha=0
+      data[pixelIndex] = alpha < 0.5 ? 0 : 255;
+    }
+  }
+
+  outCtx.putImageData(imageData, 0, 0);
+  const jpgDataUrl = outputCanvas.toDataURL("image/jpeg", 0.95);
+
+  // Cleanup
+  img.src = "";
+  canvas.width = 0;
+  canvas.height = 0;
+  outputCanvas.width = 0;
+  outputCanvas.height = 0;
+
+  if (imageBitmap && imageBitmap !== canvas) {
+    try {
+      imageBitmap.close?.();
+    } catch {
+      // ImageBitmap close might not be available
+    }
+  }
+
+  return jpgDataUrl;
+}
+
+/**
+ * Helper to get pixel color at a specific location
+ */
+function getPixelAt(img, x, y, width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, -x, -y, width, height);
+  const data = ctx.getImageData(0, 0, 1, 1).data;
+  return {
+    r: data[0],
+    g: data[1],
+    b: data[2],
+    a: data[3]
+  };
+}
+
+
+================================
+FILE: lib/batchQueue.js
+================================
+
+export class BatchQueue {
+  constructor() {
+    this.queue = [];
+    this.isProcessing = false;
+  }
+
+  add(task) {
+    this.queue.push(task);
+  }
+
+  addBatch(tasks) {
+    this.queue.push(...tasks);
+  }
+
+  next() {
+    return this.queue.shift();
+  }
+
+  size() {
+    return this.queue.length;
+  }
+
+  clear() {
+    this.queue = [];
+  }
+
+  async process(processor) {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+
+    const results = [];
+    while (this.queue.length > 0) {
+      const task = this.next();
+      try {
+        const result = await processor(task);
+        results.push(result);
+      } catch (error) {
+        console.error("Batch processing error:", error);
+        results.push({ error: error.message });
+      }
+    }
+
+    this.isProcessing = false;
+    return results;
+  }
+}
+
+================================
+FILE: lib/exportZip.js
+================================
+
+import JSZip from "jszip";
+
+export async function exportZip(results) {
+  const zip = new JSZip();
+
+  // Create main results folder
+  const resultsFolder = zip.folder("background-removed");
+
+  results.forEach((result, i) => {
+    if (result.error) return; // Skip errors
+
+    const fileName = result.fileName || `image_${i}`;
+    const baseName = fileName.split(".")[0];
+
+    // Extract base64 data from data URL
+    const base64Data = result.dataUrl.split(",")[1];
+    resultsFolder.file(`${baseName}_no_bg.png`, base64Data, { base64: true });
+  });
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  return blob;
+}
+
+export function downloadZip(blob, fileName = "background-removed.zip") {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+================================
+FILE: lib/removeBackground.js
+================================
+
+import { initWorker, segmentImage, isWorkerReady } from "./aiWorkerClient";
+
+let workerInitPromise = null;
+let mainThreadModel = null;
+let useMainThread = false;
+let transformersPromise = null;
+
+async function getTransformers() {
+  if (!transformersPromise) {
+    transformersPromise = import("@xenova/transformers");
+  }
+  return transformersPromise;
+}
+
+function ensureWorkerInit() {
+
+  if (isWorkerReady()) {
+    return Promise.resolve();
+  }
+
+  if (workerInitPromise) {
+    return workerInitPromise;
+  }
+
+  workerInitPromise = (async () => {
+
+    try {
+      await initWorker();
+    } catch (error) {
+      console.warn(
+        "Worker initialization failed. Falling back to main thread:",
+        error
+      );
+      useMainThread = true;
+    }
+
+  })();
+
+  return workerInitPromise;
+}
+
+async function getMainThreadModel() {
+
+  if (mainThreadModel) return mainThreadModel;
+
+  try {
+
+    const { pipeline } = await getTransformers();
+
+    mainThreadModel = await pipeline(
+      "image-segmentation",
+      "Xenova/deeplabv3-resnet50",
+      {
+        quantized: true
+      }
+    );
+
+    return mainThreadModel;
+
+  } catch (error) {
+
+    console.error("Failed to load fallback model:", error);
+    throw error;
+
+  }
+}
+
+function extractMaskTensor(result) {
+
+  if (Array.isArray(result) && result[0]?.mask) {
+    return result[0].mask;
+  }
+
+  if (result?.masks?.[0]) {
+    return result.masks[0];
+  }
+
+  if (result?.segmentation) {
+    return result.segmentation;
+  }
+
+  if (result?.data && result?.dims) {
+    return result;
+  }
+
+  throw new Error("Unsupported segmentation output format");
+
+}
+
+export default async function removeBackground(imageUrl) {
+
+  await ensureWorkerInit();
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageUrl;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  const width = img.width;
+  const height = img.height;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+
+  let maskData;
+  let maskShape;
+
+  if (useMainThread) {
+
+    const model = await getMainThreadModel();
+    const result = await model(imageUrl);
+
+    const maskTensor = extractMaskTensor(result);
+
+    maskData = maskTensor.data;
+    maskShape = maskTensor.dims;
+
+  } else {
+
+    const imageDataForWorker = ctx.getImageData(0, 0, width, height);
+
+    try {
+
+      const result = await segmentImage(imageDataForWorker);
+
+      maskData = result.maskData;
+      maskShape = result.maskShape;
+
+    } catch (error) {
+
+      console.warn(
+        "Worker segmentation failed, switching to main thread:",
+        error
+      );
+
+      useMainThread = true;
+
+      const model = await getMainThreadModel();
+      const result = await model(imageUrl);
+
+      const maskTensor = extractMaskTensor(result);
+
+      maskData = maskTensor.data;
+      maskShape = maskTensor.dims;
+
+    }
+
+  }
+
+  if (!maskData || !maskShape) {
+    throw new Error("Mask data not returned from segmentation model");
+  }
+
+  const maskHeight = maskShape[0];
+  const maskWidth = maskShape[1];
+
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = width;
+  finalCanvas.height = height;
+
+  const finalCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
+  finalCtx.drawImage(img, 0, 0);
+
+  const imageData = finalCtx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  const scaleX = maskWidth / width;
+  const scaleY = maskHeight / height;
+
+  for (let y = 0; y < height; y++) {
+
+    for (let x = 0; x < width; x++) {
+
+      const maskX = Math.floor(x * scaleX);
+      const maskY = Math.floor(y * scaleY);
+
+      const maskIndex = maskY * maskWidth + maskX;
+
+      let alpha = maskData[maskIndex] * 255;
+
+      if (alpha > 255) alpha = 255;
+      if (alpha < 0) alpha = 0;
+
+      const pixelIndex = (y * width + x) * 4 + 3;
+
+      data[pixelIndex] = alpha;
+
+    }
+
+  }
+
+  finalCtx.putImageData(imageData, 0, 0);
+
+  const pngDataUrl = finalCanvas.toDataURL("image/png");
+
+  img.src = "";
+  canvas.width = 0;
+  canvas.height = 0;
+  finalCanvas.width = 0;
+  finalCanvas.height = 0;
+
+  return pngDataUrl;
+
+}
+
+================================
+FILE: next-env.d.ts
+================================
+
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+import "./.next/dev/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+================================
+FILE: next.config.ts
+================================
+
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  webpack(config) {
+
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+      layers: true
+    };
+
+    config.resolve.fallback = {
+      fs: false,
+      path: false
+    };
+
+    return config;
+  }
+};
+
+export default nextConfig;
+
+================================
+FILE: plugins/pluginSystem.js
+================================
+
+export class PluginSystem{
+
+  constructor(){
+
+    this.plugins=[];
+
+  }
+
+  register(plugin){
+
+    this.plugins.push(plugin);
+
+  }
+
+  run(ctx){
+
+    this.plugins.forEach(p=>p(ctx));
+
+  }
+
+}
+
+================================
+FILE: store/imageStore.js
+================================
+
+import { create } from "zustand";
+
+const useImageStore = create((set, get) => ({
+
+  // Single image mode
+  image: null,
+  result: null,
+  processing: false,
+
+  // Batch mode
+  batchQueue: [],
+  batchResults: [],
+  batchMode: false,
+
+  // Background replacement
+  backgroundMode: null, // null | "color" | "image"
+  backgroundColor: "#ffffff",
+  backgroundImage: null,
+
+  setImage: (img) => {
+    const state = get();
+    if (state.image && state.image.startsWith('blob:')) {
+      URL.revokeObjectURL(state.image);
+    }
+    set({ image: img, result: null, backgroundMode: null });
+  },
+
+  setResult: (img) => {
+    set({ result: img });
+  },
+
+  setProcessing: (processing) => set({ processing }),
+
+  // Background replacement state management
+  setBackgroundColor: (color) => {
+    set({ backgroundMode: "color", backgroundColor: color });
+  },
+
+  setBackgroundImage: (imageUrl) => {
+    const state = get();
+    if (state.backgroundImage && state.backgroundImage.startsWith('blob:')) {
+      URL.revokeObjectURL(state.backgroundImage);
+    }
+    set({ backgroundMode: "image", backgroundImage: imageUrl });
+  },
+
+  clearBackground: () => {
+    const state = get();
+    if (state.backgroundImage && state.backgroundImage.startsWith('blob:')) {
+      URL.revokeObjectURL(state.backgroundImage);
+    }
+    set({ backgroundMode: null, backgroundImage: null });
+  },
+
+  // Batch operations
+  addToBatch: (files) => {
+    const newQueue = files.map((file) => ({
+      file: file,
+      fileName: file.name,
+      url: URL.createObjectURL(file),
+      status: "pending", // pending | processing | done | error
+      result: null,
+      error: null
+    }));
+    set((state) => ({
+      batchQueue: [...state.batchQueue, ...newQueue],
+      batchMode: true
+    }));
+  },
+
+  updateBatchItem: (index, updates) =>
+    set((state) => ({
+      batchQueue: state.batchQueue.map((item, i) =>
+        i === index ? { ...item, ...updates } : item
+      )
+    })),
+
+  addBatchResult: (result) => {
+    set((state) => ({
+      batchResults: [...state.batchResults, result]
+    }));
+  },
+
+  clearBatch: () => {
+    const state = get();
+    // Cleanup all blob URLs
+    state.batchQueue.forEach((item) => {
+      if (item.url.startsWith('blob:')) {
+        URL.revokeObjectURL(item.url);
+      }
+    });
+    set({
+      batchQueue: [],
+      batchResults: [],
+      batchMode: false
+    });
+  },
+
+  clearAll: () => {
+    const state = get();
+    if (state.image && state.image.startsWith('blob:')) {
+      URL.revokeObjectURL(state.image);
+    }
+    if (state.backgroundImage && state.backgroundImage.startsWith('blob:')) {
+      URL.revokeObjectURL(state.backgroundImage);
+    }
+    state.batchQueue.forEach((item) => {
+      if (item.url.startsWith('blob:')) {
+        URL.revokeObjectURL(item.url);
+      }
+    });
+    set({
+      image: null,
+      result: null,
+      processing: false,
+      batchQueue: [],
+      batchResults: [],
+      batchMode: false,
+      backgroundMode: null,
+      backgroundColor: "#ffffff",
+      backgroundImage: null
+    });
+  }
+
+}));
+
+export default useImageStore;
+
+================================
+FILE: tailwind.config.js
+================================
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+
+
+================================
+FILE: workers/aiWorker.js
+================================
+
+let pipelineFn = null;
+
+async function getPipeline() {
+  if (!pipelineFn) {
+    const { pipeline } = await import("@xenova/transformers");
+    pipelineFn = pipeline;
+  }
+  return pipelineFn;
+}
+
+let modelInstance = null;
+let modelLoading = false;
+
+async function initializeModel() {
+
+  if (modelInstance) return modelInstance;
+
+  if (modelLoading) {
+    return new Promise((resolve, reject) => {
+
+      const interval = setInterval(() => {
+        if (modelInstance) {
+          clearInterval(interval);
+          resolve(modelInstance);
+        }
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(interval);
+        reject(new Error("Model initialization timeout"));
+      }, 120000);
+
+    });
+  }
+
+  modelLoading = true;
+
+  try {
+
+    const pipeline = await getPipeline();
+
+    modelInstance = await pipeline(
+      "image-segmentation",
+      "Xenova/deeplabv3-resnet50",
+      {
+        quantized: true
+      }
+    );
+
+    modelLoading = false;
+    return modelInstance;
+
+  } catch (error) {
+
+    modelLoading = false;
+    throw error;
+
+  }
+
+}
+
+self.onmessage = async (e) => {
+
+  const { id, type, data } = e.data;
+
+  try {
+
+    if (type === "INIT") {
+
+      await initializeModel();
+
+      self.postMessage({
+        id,
+        type: "INIT_COMPLETE",
+        success: true
+      });
+
+      return;
+
+    }
+
+    if (type === "SEGMENT") {
+
+      const model = await initializeModel();
+      const { imageData } = data;
+
+      const result = await model(imageData);
+
+      const maskTensor =
+        result?.[0]?.mask ||
+        result?.masks?.[0] ||
+        result?.segmentation ||
+        result;
+
+      if (!maskTensor || !maskTensor.data) {
+        throw new Error("Mask tensor not returned from model");
+      }
+
+      const maskData = maskTensor.data;
+      const maskShape = maskTensor.dims;
+
+      const buffer = maskData.slice().buffer;
+
+      self.postMessage(
+        {
+          id,
+          type: "SEGMENT_COMPLETE",
+          success: true,
+          data: {
+            maskData,
+            maskShape
+          }
+        },
+        [buffer]
+      );
+
+    }
+
+  } catch (error) {
+
+    self.postMessage({
+      id,
+      type: "ERROR",
+      success: false,
+      error: error.message
+    });
+
+  }
+
+};
